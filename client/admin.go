@@ -15,6 +15,8 @@ import (
 	"context"
 
 	server "github.com/milvus-io/milvus-proto/go-api/v2/milvuspb"
+
+	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 )
 
 // GetVersion returns milvus server version information.
@@ -27,4 +29,26 @@ func (c *GrpcClient) GetVersion(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return resp.GetVersion(), nil
+}
+
+// CheckHealth returns milvus state
+func (c *GrpcClient) CheckHealth(ctx context.Context) (*entity.MilvusState, error) {
+	if c.Service == nil {
+		return nil, ErrClientNotReady
+	}
+	resp, err := c.Service.CheckHealth(ctx, &server.CheckHealthRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	states := make([]entity.QuotaState, 0, len(resp.GetQuotaStates()))
+	for _, state := range resp.GetQuotaStates() {
+		states = append(states, entity.QuotaState(state))
+	}
+
+	return &entity.MilvusState{
+		IsHealthy:   resp.GetIsHealthy(),
+		Reasons:     resp.GetReasons(),
+		QuotaStates: states,
+	}, nil
 }
