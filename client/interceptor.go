@@ -66,3 +66,33 @@ func createMetaDataUnaryInterceptor(cfg *Config) grpc.UnaryClientInterceptor {
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
+
+func createRedirectUnaryInterceptor(cfg *Config) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		var trailer metadata.MD
+		opts = append(opts, grpc.Trailer(&trailer))
+
+		err := invoker(ctx, method, req, reply, cc, opts...)
+		if err == nil {
+			return nil
+		}
+
+		if len(trailer.Get("x-milvus-redirection")) == 0 {
+			return err
+		}
+		fmt.Println("redirect to", trailer.Get("x-milvus-redirection")[0])
+		redirection := trailer.Get("x-milvus-redirection")[0]
+		cfg.Address = redirection
+		if err := cfg.parse(); err != nil {
+			return err
+		}
+
+		conn, err := grpc.DialContext(ctx, cfg.getParsedAddress(), cfg.getDialOption()...)
+		if err != nil {
+			return err
+		}
+		cc = conn
+
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}

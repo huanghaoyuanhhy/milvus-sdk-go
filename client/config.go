@@ -164,6 +164,9 @@ func (c *Config) getDialOption() []grpc.DialOption {
 	options = append(options, grpc.WithChainUnaryInterceptor(
 		createMetaDataUnaryInterceptor(c),
 	))
+
+	options = append(options, grpc.WithChainUnaryInterceptor(createRedirectUnaryInterceptor(c)))
+
 	return options
 }
 
